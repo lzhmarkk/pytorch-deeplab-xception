@@ -1,8 +1,8 @@
-from dataloaders.datasets import cityscapes, coco, combine_dbs, pascal, sbd
+from dataloaders.datasets import cityscapes, coco, combine_dbs, pascal, sbd, my_dataset, penn
 from torch.utils.data import DataLoader
 
-def make_data_loader(args, **kwargs):
 
+def make_data_loader(args, **kwargs):
     if args.dataset == 'pascal':
         train_set = pascal.VOCSegmentation(args, split='train')
         val_set = pascal.VOCSegmentation(args, split='val')
@@ -37,6 +37,22 @@ def make_data_loader(args, **kwargs):
         test_loader = None
         return train_loader, val_loader, test_loader, num_class
 
+    elif args.dataset == 'mydataset':
+        train_inputs, val_inputs = my_dataset.MyDataset.apart(0.1)
+        train_set = my_dataset.MyDataset(train_inputs)
+        val_set = my_dataset.MyDataset(val_inputs)
+        num_class = 2  # 3
+        train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, **kwargs)
+        val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, **kwargs)
+        test_loader = None
+        return train_loader, val_loader, test_loader, num_class
+
+    elif args.dataset == 'penn':
+        train_set = penn.PennFudanDataset()
+        num_class = 2
+        train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, **kwargs)
+        val_loader = train_loader
+        test_loader = None
+        return train_loader, val_loader, test_loader, num_class
     else:
         raise NotImplementedError
-

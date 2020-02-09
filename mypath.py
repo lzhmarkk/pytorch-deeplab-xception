@@ -9,6 +9,10 @@ class Path(object):
             return '/path/to/datasets/cityscapes/'     # foler that contains leftImg8bit/
         elif dataset == 'coco':
             return '/path/to/datasets/coco/'
+        elif dataset == 'mydataset':
+            return '/run/media/lzhmark/shared/boe-screen/cut/'
+        elif dataset == 'penn':
+            return '/run/media/lzhmark/shared/shared_codes/PedRecognize/dataset/PennFudanPed'
         else:
             print('Dataset {} not available.'.format(dataset))
             raise NotImplementedError
