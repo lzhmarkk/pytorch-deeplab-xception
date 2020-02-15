@@ -10,21 +10,26 @@ from mypath import Path
 
 
 class MyDataset(Dataset):
-    def __init__(self, file_names):
+    def __init__(self, file_names, dataset, classify):
         self.mean = (0.5071, 0.4867, 0.4408)
         self.stdv = (0.2675, 0.2565, 0.2761)
-        self.dir = Path.db_root_dir("mydataset")
-        # {'true':[name1,name2],'false':[name3,name4]}
+        self.dir = Path.db_root_dir(dataset)
+        self.dataset = dataset
+        self.classify = classify
+        print("本次运行{}分类".format('使用' if self.classify == 'True' else '只分割不'))
         files = []
-        for _class in ['true', 'false']:
+        self.classes = list(file_names.keys())
+        for _class in self.classes:
             for file in file_names[_class]:
                 files.append([file, _class])
         self.files = sorted(files)
 
     def __getitem__(self, idx):
         _class = self.files[idx][1]
+        ext = '.png' if self.dataset == 'all' else '.jpg'
         img = Image.open(os.path.join(self.dir, 'images', _class, self.files[idx][0] + '.jpg')).convert('RGB')
-        mask = Image.open(os.path.join(self.dir, 'masks', _class, self.files[idx][0] + '.jpg'))
+        mask = Image.open(os.path.join(self.dir, 'masks', _class, self.files[idx][0] + ext))
+        mask = mask.resize(img.size)  # forced resize
         mask = np.array(mask, dtype=np.uint8)
         mask = self._decode(mask, _class)
         target = Image.fromarray(mask)
@@ -36,41 +41,40 @@ class MyDataset(Dataset):
 
     def transform(self, sample):
         train_transform = transforms.Compose([
-            # tr.FixedResize(700),  # 如果内存不够就resize
+            tr.FixedResize(700),  # 如果内存不够就resize
             # tr.Normalize(mean=self.mean, std=self.stdv),
             tr.ToTensor(),
         ])
         return train_transform(sample)
 
     def _decode(self, mask, _class):
-        # _class为false时，将mask中非背景的部分变为2
-        if _class == 'true':
-            mask[mask != 0] = 1
+        # 若不做分类(self.classify=False)，则把所有的都视为同一类
+        if self.classify == 'True':
+            mask[mask != 0] = self.classes.index(_class) + 1
         else:
-            mask[mask != 0] = 1  # 2,不分类
+            mask[mask != 0] = 1
         return mask
 
     @staticmethod
-    def apart(test_size):
+    def apart(test_size, dataset):
         """
         test_size：从每个class值中取多少张作为测试集
         """
         assert 0 < test_size < 1, "比例啦"
 
         # 读取文件名
-        file_names_true, file_names_false = [], []
-        dir = Path.db_root_dir("mydataset")
-        for _class in ['true', 'false']:
-            for root, __, files in os.walk(os.path.join(dir, 'images', _class)):
+        file_names = {}
+        classes = []
+        dir = Path.db_root_dir(dataset)
+        for root, dirs, files in os.walk(os.path.join(dir, 'masks')):
+            # 如果是/mask的一级子文件夹
+            if os.path.split(root)[0] == os.path.join(dir, 'masks'):
+                _class = os.path.split(root)[1]  # 子文件夹名
+                classes.append(_class)
                 for file in files:
-                    if _class == 'true':
-                        file_names_true.append(os.path.splitext(file)[0])
-                    else:
-                        file_names_false.append(os.path.splitext(file)[0])
-
-        # debug
-        # file_names_true = file_names_true[:8]
-        # file_names_false = file_names_false[:8]
+                    if _class not in file_names.keys():
+                        file_names[_class] = []
+                    file_names[_class].append(os.path.splitext(file)[0])
 
         def rand_select(data, size):
             test = []
@@ -81,23 +85,13 @@ class MyDataset(Dataset):
             train = [data[i] for i in index if i not in idx]
             return train, test
 
-        train_data_true, test_data_true = rand_select(file_names_true, 1 + int(len(file_names_true) * test_size))
-        train_data_false, test_data_false = rand_select(file_names_false, 1 + int(len(file_names_false) * test_size))
+        train_data, test_data = {}, {}
+        for _class in classes:
+            train_data[_class], test_data[_class] = rand_select(file_names[_class],
+                                                                int(len(file_names[_class]) * test_size))
+            print("{}：训练{}张，测试{}张".format(_class, len(train_data[_class]), len(test_data[_class])))
 
-        train_inputs_true, train_inputs_false, test_inputs_true, test_inputs_false = [], [], [], []
-        for train_img in train_data_true:
-            train_inputs_true.append(str(train_img))
-        for test_img in test_data_true:
-            test_inputs_true.append(str(test_img))
-        for train_img in train_data_false:
-            train_inputs_false.append(str(train_img))
-        for test_img in test_data_false:
-            test_inputs_false.append(str(test_img))
-
-        train_inputs = {'true': train_inputs_true, 'false': train_inputs_false}
-        test_inputs = {'true': test_inputs_true, 'false': test_inputs_false}
-
-        return train_inputs, test_inputs
+        return train_data, test_data
 
 
 if __name__ == '__main__':
@@ -109,9 +103,11 @@ if __name__ == '__main__':
     import torchvision
     from dataloaders.utils import decode_segmap
 
-    train_files, _ = MyDataset.apart(0.1)
-    dataset = MyDataset(train_files)
-    train_loader = DataLoader(dataset, batch_size=2, shuffle=True)
+    _dataset = 'all'
+
+    train_files, _ = MyDataset.apart(0.1, _dataset)
+    dataset = MyDataset(train_files, dataset=_dataset, classify=False)
+    train_loader = DataLoader(dataset, batch_size=16, shuffle=True)
 
     samples = next(iter(train_loader))
 
@@ -120,7 +116,7 @@ if __name__ == '__main__':
         if type == 'label':
             for idx, label_mask in enumerate(images):
                 plt.title('masks{}'.format(idx))
-                plt.imshow(decode_segmap(np.array(label_mask), 'mydataset'))
+                plt.imshow(decode_segmap(np.array(label_mask), _dataset))
                 plt.show()
         else:
             sample = torchvision.utils.make_grid(images, normalize=True)

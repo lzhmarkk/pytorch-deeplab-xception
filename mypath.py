@@ -6,13 +6,15 @@ class Path(object):
         elif dataset == 'sbd':
             return '/path/to/datasets/benchmark_RELEASE/'  # folder that contains dataset/.
         elif dataset == 'cityscapes':
-            return '/path/to/datasets/cityscapes/'     # foler that contains leftImg8bit/
+            return '/path/to/datasets/cityscapes/'  # foler that contains leftImg8bit/
         elif dataset == 'coco':
             return '/path/to/datasets/coco/'
         elif dataset == 'mydataset':
             return '/run/media/lzhmark/shared/boe-screen/cut/'
         elif dataset == 'penn':
             return '/run/media/lzhmark/shared/shared_codes/PedRecognize/dataset/PennFudanPed'
+        elif dataset == 'all':
+            return '/run/media/lzhmark/shared/boe-screen/all/'
         else:
             print('Dataset {} not available.'.format(dataset))
             raise NotImplementedError

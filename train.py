@@ -188,7 +188,7 @@ def main():
     parser.add_argument('--out-stride', type=int, default=16,
                         help='network output stride (default: 8)')
     parser.add_argument('--dataset', type=str, default='pascal',
-                        choices=['pascal', 'coco', 'cityscapes', 'mydataset', 'penn'],
+                        choices=['pascal', 'coco', 'cityscapes', 'mydataset', 'penn', 'all'],
                         help='dataset name (default: pascal)')
     parser.add_argument('--use-sbd', action='store_true', default=True,
                         help='whether to use SBD dataset (default: True)')
@@ -251,6 +251,10 @@ def main():
                         help='evaluuation interval (default: 1)')
     parser.add_argument('--no-val', action='store_true', default=False,
                         help='skip validation during training')
+    # 是否区分class
+    parser.add_argument('--classify', type=str, default='False',
+                        choices=['False', 'True'],
+                        help='True则作分类，False就只分割')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and torch.cuda.is_available()
